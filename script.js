@@ -192,14 +192,15 @@ const modalDescription = document.getElementById('modalDescription');
 const modalClose = document.querySelector('.modal-close');
 
 function attachProductListeners() {
-    const quickViewButtons = document.querySelectorAll('.btn-quick-view');
+    // Make entire product card clickable
+    const productCards = document.querySelectorAll('.product-card');
     
-    if (quickViewButtons.length === 0) return;
+    if (productCards.length === 0) return;
     
-    quickViewButtons.forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const productId = parseInt(button.getAttribute('data-product-id'));
+    productCards.forEach(card => {
+        card.style.cursor = 'pointer';
+        card.addEventListener('click', (e) => {
+            const productId = parseInt(card.getAttribute('data-product-id'));
             const product = allProducts.find(p => p.id === productId);
             
             if (product && modal) {
