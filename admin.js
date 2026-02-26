@@ -499,17 +499,40 @@ async function exportEmails() {
         
         const emails = subscribers.map(s => s.email).join(', ');
         
-        // Create a temporary textarea to copy the emails
+        // Try modern Clipboard API first (works better on mobile)
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+                await navigator.clipboard.writeText(emails);
+                alert(`✅ ${subscribers.length} email addresses copied to clipboard!\n\nYou can now paste them into:\n• Gmail (BCC field)\n• Mailchimp\n• Facebook Custom Audience\n• Any email marketing tool`);
+                return;
+            } catch (clipboardError) {
+                console.log('Clipboard API failed, trying fallback method');
+            }
+        }
+        
+        // Fallback for older browsers
         const textarea = document.createElement('textarea');
         textarea.value = emails;
         textarea.style.position = 'fixed';
         textarea.style.opacity = '0';
+        textarea.style.left = '-9999px';
         document.body.appendChild(textarea);
+        textarea.focus();
         textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
         
-        alert(`✅ ${subscribers.length} email addresses copied to clipboard!\n\nYou can now paste them into:\n• Gmail (BCC field)\n• Mailchimp\n• Facebook Custom Audience\n• Any email marketing tool`);
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                alert(`✅ ${subscribers.length} email addresses copied to clipboard!\n\nYou can now paste them into:\n• Gmail (BCC field)\n• Mailchimp\n• Facebook Custom Audience\n• Any email marketing tool`);
+            } else {
+                throw new Error('Copy command failed');
+            }
+        } catch (err) {
+            // If all methods fail, show the emails in an alert so user can manually copy
+            alert(`Copy failed. Here are the emails:\n\n${emails}\n\nPlease select and copy them manually.`);
+        } finally {
+            document.body.removeChild(textarea);
+        }
         
     } catch (error) {
         console.error('Error exporting emails:', error);
