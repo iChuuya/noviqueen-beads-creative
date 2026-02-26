@@ -1,0 +1,32 @@
+[
+  {
+    "id": 4,
+    "name": "🤍 Noviqueen Pearl Noir Tote",
+    "description": "The Noviqueen Pearl Noir Tote is a bold expression of timeless elegance. Handcrafted with premium ivory pearl beads and accented with sleek black detailing, this structured tote brings sophistication and modern charm together in one statement piece.\r\n\r\nIts unique triangular silhouette makes it stand out effortlessly — perfect for weddings, formal events, dinner parties, or elevating a simple outfit into something extraordinary.\r\n\r\n✨ Handcrafted premium beadwork\r\n✨ Elegant ivory & black contrast design\r\n✨ Structured and durable shape\r\n✨ Perfect for special occasions and statement styling\r\n\r\nMade for queens who embrace classic beauty with a daring twist.",
+    "price": 1000,
+    "category": "bags",
+    "image": "/uploads/1772131212287-5081094.jpg",
+    "inStock": true,
+    "featured": true
+  },
+  {
+    "id": 5,
+    "name": "💙 Noviqueen Aqua Royale",
+    "description": "Fresh, radiant, and effortlessly luxurious — the Noviqueen Aqua Royale captures the brilliance of crystal-clear waters in a beautifully handcrafted bead design.\r\n\r\nWith its eye-catching aqua finish and elegant ring handle, this bag adds a vibrant yet classy touch to any look. Lightweight yet sturdy, it’s designed for parties, celebrations, brunch dates, and moments when you want to shine.\r\n\r\n✨ Crystal-inspired aqua bead design\r\n✨ Elegant round handle accent\r\n✨ Lightweight and comfortable to carry\r\n✨ A standout piece for stylish occasions\r\n\r\nA royal glow in every detail.",
+    "price": 2000,
+    "category": "bags",
+    "image": "/uploads/1772131295642-319395486.jpg",
+    "inStock": true,
+    "featured": true
+  },
+  {
+    "id": 6,
+    "name": "💗 Noviqueen Blush Royale",
+    "description": "Soft, feminine, and undeniably luxurious — the Noviqueen Blush Royale is designed for romantic elegance. Crafted with glossy pink beads, a pearl-detailed handle, and gold chain accents, this bag radiates charm and grace.\r\n\r\nWhether for weddings, debuts, formal gatherings, or gifting someone special, this piece adds a refined sparkle to your ensemble.\r\n\r\n✨ Premium glossy pink beadwork\r\n✨ Pearl-detailed handle\r\n✨ Elegant gold chain accent\r\n✨ Perfect for romantic and formal occasions\r\n\r\nBecause every queen deserves a blush of royalty.",
+    "price": 2500,
+    "category": "bags",
+    "image": "/uploads/1772131326483-932696431.jpg",
+    "inStock": true,
+    "featured": true
+  }
+]

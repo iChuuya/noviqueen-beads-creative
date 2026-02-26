@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .box {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 { color: #8B4513; }
+        button {
+            background: #8B4513;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover { background: #6D3410; }
+        .success { background: #d4edda; color: #155724; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .error { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .info { background: #cce5ff; color: #004085; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>🔧 Admin Login Diagnostics</h1>
+        <p>This tool will help fix your admin login issue.</p>
+        
+        <div id="results"></div>
+        
+        <h2>Step 1: Clear Cache & Session</h2>
+        <button onclick="clearEverything()">Clear Cache & Session Data</button>
+        
+        <h2>Step 2: Test Login API</h2>
+        <button onclick="testLogin()">Test Login Endpoint</button>
+        
+        <h2>Step 3: Go to Admin Panel</h2>
+        <button onclick="goToAdmin()">Open Fresh Admin Panel</button>
+        
+        <div class="info" style="margin-top: 30px;">
+            <h3>Manual Steps:</h3>
+            <ol>
+                <li>Click "Clear Cache & Session Data" above</li>
+                <li>Click "Test Login Endpoint" to verify API works</li>
+                <li>Click "Open Fresh Admin Panel"</li>
+                <li>Login with: <strong>admin</strong> / <strong>admin123</strong></li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const results = document.getElementById('results');
+
+        function showMessage(message, type) {
+            results.innerHTML += `<div class="${type}">${message}</div>`;
+        }
+
+        function clearEverything() {
+            results.innerHTML = '';
+            
+            // Clear sessionStorage
+            sessionStorage.clear();
+            showMessage('✅ Cleared Session Storage', 'success');
+            
+            // Clear localStorage
+            localStorage.clear();
+            showMessage('✅ Cleared Local Storage', 'success');
+            
+            // Clear all cookies
+            document.cookie.split(";").forEach(function(c) { 
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+            showMessage('✅ Cleared Cookies', 'success');
+            
+            showMessage('✅ All cache cleared! Now click "Test Login Endpoint"', 'info');
+        }
+
+        async function testLogin() {
+            showMessage('⏳ Testing login API...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        username: 'admin', 
+                        password: 'admin123' 
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('✅ Login API is working perfectly!', 'success');
+                    showMessage(`Response: ${JSON.stringify(data, null, 2)}`, 'success');
+                    showMessage('✅ You can now click "Open Fresh Admin Panel" and login!', 'info');
+                } else {
+                    showMessage(`❌ Login failed: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`❌ Error testing login: ${error.message}`, 'error');
+                showMessage('Make sure the server is running with: npm start', 'error');
+            }
+        }
+
+        function goToAdmin() {
+            // Clear everything one more time
+            sessionStorage.clear();
+            localStorage.clear();
+            
+            showMessage('✅ Opening admin panel in new tab...', 'success');
+            
+            // Open in new tab with cache busting
+            const url = 'http://localhost:3000/admin?' + new Date().getTime();
+            window.open(url, '_blank');
+        }
+
+        // Auto-clear on load
+        window.onload = () => {
+            showMessage('👋 Welcome! Click the buttons above to fix your login issue.', 'info');
+        };
+    </script>
+</body>
+</html>

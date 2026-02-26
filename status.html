@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Status - NoviQueen</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #8B4513;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .status-item {
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 10px;
+            border-left: 5px solid #ccc;
+            background: #f8f9fa;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-item.checking {
+            border-color: #ffc107;
+            background: #fff3cd;
+        }
+
+        .status-item.success {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+
+        .status-item.error {
+            border-color: #dc3545;
+            background: #f8d7da;
+        }
+
+        .status-label {
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .badge-checking {
+            background: #ffc107;
+            color: #856404;
+        }
+
+        .badge-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .badge-error {
+            background: #dc3545;
+            color: white;
+        }
+
+        .actions {
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button, .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #8B4513;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #6D3410;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .details {
+            margin-top: 10px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9em;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #8B4513;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-box {
+            background: #cce5ff;
+            border-left: 5px solid #004085;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            color: #004085;
+        }
+
+        .error-details {
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 5px;
+            font-size: 0.9em;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 System Status Check</h1>
+        <p class="subtitle">NoviQueen Beads Creative</p>
+
+        <div id="serverStatus" class="status-item checking">
+            <div>
+                <div class="status-label">Backend Server</div>
+                <div class="status-detail">http://localhost:3000</div>
+            </div>
+            <span class="status-badge badge-checking">
+                <span class="spinner"></span> Checking...
+            </span>
+        </div>
+
+        <div id="apiStatus" class="status-item checking">
+            <div>
+                <div class="status-label">Products API</div>
+                <div class="status-detail">/api/products</div>
+            </div>
+            <span class="status-badge badge-checking">
+                <span class="spinner"></span> Checking...
+            </span>
+        </div>
+
+        <div id="loginStatus" class="status-item checking">
+            <div>
+                <div class="status-label">Admin Login</div>
+                <div class="status-detail">/api/admin/login</div>
+            </div>
+            <span class="status-badge badge-checking">
+                <span class="spinner"></span> Checking...
+            </span>
+        </div>
+
+        <div id="infoBox" class="info-box" style="display: none;">
+            <strong>ℹ️ Troubleshooting Tips:</strong>
+            <ul style="margin-top: 10px; margin-left: 20px;">
+                <li>Make sure you ran <code>npm install</code></li>
+                <li>Start the server with <code>npm start</code></li>
+                <li>Check if port 3000 is already in use</li>
+                <li>Look at terminal for error messages</li>
+            </ul>
+        </div>
+
+        <div class="actions">
+            <button onclick="checkAll()" class="btn btn-secondary">🔄 Recheck</button>
+            <a href="http://localhost:3000" class="btn btn-primary">🌐 Open Website</a>
+            <a href="http://localhost:3000/admin" class="btn btn-success">⚙️ Open Admin</a>
+        </div>
+    </div>
+
+    <script>
+        async function checkServer() {
+            const statusEl = document.getElementById('serverStatus');
+            try {
+                const response = await fetch('http://localhost:3000', { method: 'HEAD' });
+                if (response.ok) {
+                    statusEl.className = 'status-item success';
+                    statusEl.querySelector('.status-badge').className = 'status-badge badge-success';
+                    statusEl.querySelector('.status-badge').textContent = '✓ Online';
+                    return true;
+                }
+            } catch (error) {
+                statusEl.className = 'status-item error';
+                statusEl.querySelector('.status-badge').className = 'status-badge badge-error';
+                statusEl.querySelector('.status-badge').textContent = '✗ Offline';
+                document.getElementById('infoBox').style.display = 'block';
+                return false;
+            }
+        }
+
+        async function checkAPI() {
+            const statusEl = document.getElementById('apiStatus');
+            try {
+                const response = await fetch('http://localhost:3000/api/products');
+                const data = await response.json();
+                if (response.ok && Array.isArray(data)) {
+                    statusEl.className = 'status-item success';
+                    statusEl.querySelector('.status-badge').className = 'status-badge badge-success';
+                    statusEl.querySelector('.status-badge').textContent = `✓ ${data.length} products`;
+                    return true;
+                }
+            } catch (error) {
+                statusEl.className = 'status-item error';
+                statusEl.querySelector('.status-badge').className = 'status-badge badge-error';
+                statusEl.querySelector('.status-badge').textContent = '✗ Error';
+                return false;
+            }
+        }
+
+        async function checkLogin() {
+            const statusEl = document.getElementById('loginStatus');
+            try {
+                const response = await fetch('http://localhost:3000/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'admin123' })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    statusEl.className = 'status-item success';
+                    statusEl.querySelector('.status-badge').className = 'status-badge badge-success';
+                    statusEl.querySelector('.status-badge').textContent = '✓ Working';
+                    return true;
+                }
+            } catch (error) {
+                statusEl.className = 'status-item error';
+                statusEl.querySelector('.status-badge').className = 'status-badge badge-error';
+                statusEl.querySelector('.status-badge').textContent = '✗ Error';
+                return false;
+            }
+        }
+
+        async function checkAll() {
+            // Reset
+            document.querySelectorAll('.status-item').forEach(el => {
+                el.className = 'status-item checking';
+                el.querySelector('.status-badge').className = 'status-badge badge-checking';
+                el.querySelector('.status-badge').innerHTML = '<span class="spinner"></span> Checking...';
+            });
+
+            document.getElementById('infoBox').style.display = 'none';
+
+            // Check in sequence
+            const serverOk = await checkServer();
+            if (serverOk) {
+                await checkAPI();
+                await checkLogin();
+            }
+        }
+
+        // Auto-check on load
+        window.addEventListener('load', checkAll);
+    </script>
+</body>
+</html>
