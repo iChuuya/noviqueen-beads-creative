@@ -550,4 +550,42 @@ setInterval(() => {
         .catch(err => console.error('Error checking subscribers:', err));
 }, 30000); // Check every 30 seconds
 
+// ===================================
+// Backup Products Function
+// ===================================
+
+async function downloadProductsBackup() {
+    try {
+        const response = await fetch(`${API_BASE}/products`);
+        const products = await response.json();
+        
+        if (products.length === 0) {
+            alert('No products to backup');
+            return;
+        }
+        
+        // Create JSON file
+        const dataStr = JSON.stringify(products, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        // Create download link
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `products-backup-${new Date().toISOString().split('T')[0]}.json`;
+        
+        // Trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        alert(`✅ Backup downloaded!\n\n${products.length} products saved.\n\nSend this file to your developer to save permanently to GitHub.`);
+        
+    } catch (error) {
+        console.error('Error downloading backup:', error);
+        alert('Failed to download backup');
+    }
+}
+
 console.log('Admin panel loaded successfully! 🎨⚙️');
