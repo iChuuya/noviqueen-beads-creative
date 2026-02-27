@@ -213,10 +213,12 @@ productForm.addEventListener('submit', async (e) => {
             closeModal();
             loadProducts();
         } else {
-            showAlert(dashboardAlert, 'Failed to save product', 'danger');
+            console.error('Save failed:', data);
+            showAlert(dashboardAlert, data.error || 'Failed to save product', 'danger');
         }
     } catch (error) {
-        showAlert(dashboardAlert, 'An error occurred', 'danger');
+        console.error('Error saving product:', error);
+        showAlert(dashboardAlert, 'Error: ' + error.message, 'danger');
     }
 });
 

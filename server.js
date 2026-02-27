@@ -173,8 +173,8 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
         
         res.json({ success: true, product: formatProduct(createdProduct) });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to create product' });
+        console.error('Error creating product:', error);
+        res.status(500).json({ error: 'Failed to create product: ' + error.message });
     }
 });
 
@@ -224,8 +224,8 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
         
         res.json({ success: true, product: formatProduct(updated) });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to update product' });
+        console.error('Error updating product:', error);
+        res.status(500).json({ error: 'Failed to update product: ' + error.message });
     }
 });
 
