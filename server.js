@@ -6,6 +6,7 @@ const path = require('path');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const { adminDb, productDb, messageDb, subscriberDb } = require('./database');
+const { uploadImage, deleteImage, isSupabaseUrl } = require('./storage');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,20 +26,10 @@ directories.forEach(dir => {
     }
 });
 
-// Configure multer for image uploads
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
+// Configure multer for image uploads (using memory storage for Supabase)
 const upload = multer({
-    storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    storage: multer.memoryStorage(), // Store in memory to upload to Supabase
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
     fileFilter: (req, file, cb) => {
         const filetypes = /jpeg|jpg|png|gif|webp/;
         const mimetype = filetypes.test(file.mimetype);
@@ -151,12 +142,29 @@ app.post('/api/admin/change-password', async (req, res) => {
 // Create new product
 app.post('/api/products', upload.single('image'), async (req, res) => {
     try {
+        let imageUrl = req.body.imageUrl || '';
+        
+        // Upload to Supabase if file was uploaded
+        if (req.file) {
+            const uploadResult = await uploadImage(
+                req.file.buffer,
+                req.file.originalname,
+                req.file.mimetype
+            );
+            
+            if (uploadResult.success) {
+                imageUrl = uploadResult.url;
+            } else {
+                return res.status(500).json({ error: 'Failed to upload image: ' + uploadResult.error });
+            }
+        }
+        
         const newProduct = {
             name: req.body.name,
             description: req.body.description,
             price: parseFloat(req.body.price),
             category: req.body.category,
-            image: req.file ? `/uploads/${req.file.filename}` : req.body.imageUrl || '',
+            image: imageUrl,
             inStock: req.body.inStock === 'true',
             featured: req.body.featured === 'true'
         };
@@ -190,9 +198,24 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
             image: existingProduct.image
         };
         
-        // Update image only if new file uploaded
+        // Handle image update
         if (req.file) {
-            updatedProduct.image = `/uploads/${req.file.filename}`;
+            // Upload new image to Supabase
+            const uploadResult = await uploadImage(
+                req.file.buffer,
+                req.file.originalname,
+                req.file.mimetype
+            );
+            
+            if (uploadResult.success) {
+                // Delete old image from Supabase if it exists
+                if (existingProduct.image && isSupabaseUrl(existingProduct.image)) {
+                    await deleteImage(existingProduct.image);
+                }
+                updatedProduct.image = uploadResult.url;
+            } else {
+                return res.status(500).json({ error: 'Failed to upload image: ' + uploadResult.error });
+            }
         } else if (req.body.imageUrl) {
             updatedProduct.image = req.body.imageUrl;
         }
@@ -216,12 +239,9 @@ app.delete('/api/products/:id', async (req, res) => {
             return res.status(404).json({ error: 'Product not found' });
         }
         
-        // Delete image file if it exists locally
-        if (product.image && product.image.startsWith('/uploads/')) {
-            const imagePath = path.join(__dirname, product.image);
-            if (fs.existsSync(imagePath)) {
-                fs.unlinkSync(imagePath);
-            }
+        // Delete image from Supabase if it exists
+        if (product.image && isSupabaseUrl(product.image)) {
+            await deleteImage(product.image);
         }
         
         await productDb.delete(productId);
