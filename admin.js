@@ -184,9 +184,9 @@ productForm.addEventListener('submit', async (e) => {
     
     const formData = new FormData(productForm);
     
-    // Add checkbox values
-    formData.set('inStock', document.getElementById('productInStock').checked);
-    formData.set('featured', document.getElementById('productFeatured').checked);
+    // Add checkbox values explicitly as strings
+    formData.set('inStock', document.getElementById('productInStock').checked ? 'true' : 'false');
+    formData.set('featured', document.getElementById('productFeatured').checked ? 'true' : 'false');
     
     try {
         let response;
