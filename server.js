@@ -76,8 +76,8 @@ const formatProduct = (product) => {
         price: product.price,
         category: product.category,
         image: product.image,
-        inStock: product.in_stock === 1,
-        featured: product.featured === 1
+        inStock: !!product.in_stock,
+        featured: !!product.featured
     };
 };
 
