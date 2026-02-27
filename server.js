@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
+const { adminDb, productDb, messageDb, subscriberDb } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -50,70 +51,34 @@ const upload = multer({
     }
 });
 
-// Database files
+// Database files (keeping for backup reference)
 const PRODUCTS_FILE = path.join(__dirname, 'data', 'products.json');
 const ADMIN_FILE = path.join(__dirname, 'data', 'admin.json');
 
-// Initialize products file if it doesn't exist
-if (!fs.existsSync(PRODUCTS_FILE)) {
-    const initialProducts = [
-        {
-            id: 1,
-            name: 'Pearl White Beaded Bag',
-            description: 'Elegant white beaded handbag crafted with premium pearl beads. Perfect for formal events and special occasions.',
-            price: 1299,
-            category: 'bags',
-            image: 'https://via.placeholder.com/400x500/E8D5C4/8B4513?text=Beaded+Bag+1',
-            inStock: true,
-            featured: true
-        },
-        {
-            id: 2,
-            name: 'Sky Blue Beaded Bag',
-            description: 'Tranquil blue beaded clutch that brings a sense of calm elegance. Ideal for both casual and semi-formal occasions.',
-            price: 1199,
-            category: 'bags',
-            image: 'https://via.placeholder.com/400x500/D4E8E8/4682B4?text=Beaded+Bag+2',
-            inStock: true,
-            featured: false
-        },
-        {
-            id: 3,
-            name: 'Classic Beaded Necklace',
-            description: 'Handwoven beaded necklace featuring intricate patterns and high-quality beads.',
-            price: 599,
-            category: 'jewelry',
-            image: 'https://via.placeholder.com/400x500/F5E6D3/DAA520?text=Beaded+Necklace',
-            inStock: true,
-            featured: false
-        }
-    ];
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(initialProducts, null, 2));
-}
+// Initialize admin if doesn't exist in database (default password: admin123)
+const initializeAdmin = () => {
+    const existingAdmin = adminDb.getByUsername('admin');
+    if (!existingAdmin) {
+        const hashedPassword = bcrypt.hashSync('admin123', 10);
+        adminDb.create('admin', hashedPassword);
+        console.log('✅ Default admin account created');
+    }
+};
 
-// Initialize admin file if it doesn't exist (default password: admin123)
-if (!fs.existsSync(ADMIN_FILE)) {
-    const hashedPassword = bcrypt.hashSync('admin123', 10);
-    const adminData = {
-        username: 'admin',
-        password: hashedPassword
+initializeAdmin();
+
+// Helper function to convert database product format to API format
+const formatProduct = (product) => {
+    return {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        category: product.category,
+        image: product.image,
+        inStock: product.in_stock === 1,
+        featured: product.featured === 1
     };
-    fs.writeFileSync(ADMIN_FILE, JSON.stringify(adminData, null, 2));
-}
-
-// Helper functions
-const readProducts = () => {
-    const data = fs.readFileSync(PRODUCTS_FILE, 'utf8');
-    return JSON.parse(data);
-};
-
-const writeProducts = (products) => {
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2));
-};
-
-const readAdmin = () => {
-    const data = fs.readFileSync(ADMIN_FILE, 'utf8');
-    return JSON.parse(data);
 };
 
 // ===================================
@@ -123,9 +88,10 @@ const readAdmin = () => {
 // Get all products
 app.get('/api/products', (req, res) => {
     try {
-        const products = readProducts();
+        const products = productDb.getAll().map(formatProduct);
         res.json(products);
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Failed to fetch products' });
     }
 });
@@ -133,15 +99,15 @@ app.get('/api/products', (req, res) => {
 // Get single product
 app.get('/api/products/:id', (req, res) => {
     try {
-        const products = readProducts();
-        const product = products.find(p => p.id === parseInt(req.params.id));
+        const product = productDb.getById(parseInt(req.params.id));
         
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
         
-        res.json(product);
+        res.json(formatProduct(product));
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Failed to fetch product' });
     }
 });
@@ -150,14 +116,15 @@ app.get('/api/products/:id', (req, res) => {
 app.post('/api/admin/login', (req, res) => {
     try {
         const { username, password } = req.body;
-        const admin = readAdmin();
+        const admin = adminDb.getByUsername(username);
         
-        if (username === admin.username && bcrypt.compareSync(password, admin.password)) {
+        if (admin && bcrypt.compareSync(password, admin.password)) {
             res.json({ success: true, message: 'Login successful' });
         } else {
             res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Login failed' });
     }
 });
@@ -166,17 +133,17 @@ app.post('/api/admin/login', (req, res) => {
 app.post('/api/admin/change-password', (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
-        const admin = readAdmin();
+        const admin = adminDb.getByUsername('admin');
         
-        if (bcrypt.compareSync(currentPassword, admin.password)) {
+        if (admin && bcrypt.compareSync(currentPassword, admin.password)) {
             const hashedPassword = bcrypt.hashSync(newPassword, 10);
-            admin.password = hashedPassword;
-            fs.writeFileSync(ADMIN_FILE, JSON.stringify(admin, null, 2));
+            adminDb.update('admin', hashedPassword);
             res.json({ success: true, message: 'Password changed successfully' });
         } else {
             res.status(401).json({ success: false, message: 'Current password is incorrect' });
         }
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Failed to change password' });
     }
 });
@@ -184,9 +151,7 @@ app.post('/api/admin/change-password', (req, res) => {
 // Create new product
 app.post('/api/products', upload.single('image'), (req, res) => {
     try {
-        const products = readProducts();
         const newProduct = {
-            id: products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1,
             name: req.body.name,
             description: req.body.description,
             price: parseFloat(req.body.price),
@@ -196,10 +161,10 @@ app.post('/api/products', upload.single('image'), (req, res) => {
             featured: req.body.featured === 'true'
         };
         
-        products.push(newProduct);
-        writeProducts(products);
+        const result = productDb.create(newProduct);
+        const createdProduct = productDb.getById(result.lastInsertRowid);
         
-        res.json({ success: true, product: newProduct });
+        res.json({ success: true, product: formatProduct(createdProduct) });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to create product' });
@@ -209,21 +174,21 @@ app.post('/api/products', upload.single('image'), (req, res) => {
 // Update product
 app.put('/api/products/:id', upload.single('image'), (req, res) => {
     try {
-        const products = readProducts();
-        const index = products.findIndex(p => p.id === parseInt(req.params.id));
+        const productId = parseInt(req.params.id);
+        const existingProduct = productDb.getById(productId);
         
-        if (index === -1) {
+        if (!existingProduct) {
             return res.status(404).json({ error: 'Product not found' });
         }
         
         const updatedProduct = {
-            ...products[index],
             name: req.body.name,
             description: req.body.description,
             price: parseFloat(req.body.price),
             category: req.body.category,
             inStock: req.body.inStock === 'true',
-            featured: req.body.featured === 'true'
+            featured: req.body.featured === 'true',
+            image: existingProduct.image
         };
         
         // Update image only if new file uploaded
@@ -233,10 +198,10 @@ app.put('/api/products/:id', upload.single('image'), (req, res) => {
             updatedProduct.image = req.body.imageUrl;
         }
         
-        products[index] = updatedProduct;
-        writeProducts(products);
+        productDb.update(productId, updatedProduct);
+        const updated = productDb.getById(productId);
         
-        res.json({ success: true, product: updatedProduct });
+        res.json({ success: true, product: formatProduct(updated) });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to update product' });
@@ -246,15 +211,14 @@ app.put('/api/products/:id', upload.single('image'), (req, res) => {
 // Delete product
 app.delete('/api/products/:id', (req, res) => {
     try {
-        const products = readProducts();
-        const index = products.findIndex(p => p.id === parseInt(req.params.id));
+        const productId = parseInt(req.params.id);
+        const product = productDb.getById(productId);
         
-        if (index === -1) {
+        if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
         
         // Delete image file if it exists locally
-        const product = products[index];
         if (product.image && product.image.startsWith('/uploads/')) {
             const imagePath = path.join(__dirname, product.image);
             if (fs.existsSync(imagePath)) {
@@ -262,8 +226,7 @@ app.delete('/api/products/:id', (req, res) => {
             }
         }
         
-        products.splice(index, 1);
-        writeProducts(products);
+        productDb.delete(productId);
         
         res.json({ success: true, message: 'Product deleted successfully' });
     } catch (error) {
@@ -279,8 +242,15 @@ app.delete('/api/products/:id', (req, res) => {
 // Get all messages
 app.get('/api/messages', (req, res) => {
     try {
-        const messagesData = fs.readFileSync('messages.json', 'utf8');
-        const messages = JSON.parse(messagesData);
+        const messages = messageDb.getAll().map(msg => ({
+            id: msg.id,
+            name: msg.name,
+            email: msg.email,
+            subject: msg.subject,
+            message: msg.message,
+            date: msg.created_at,
+            read: msg.status === 'read'
+        }));
         res.json(messages);
     } catch (error) {
         console.error(error);
@@ -291,27 +261,21 @@ app.get('/api/messages', (req, res) => {
 // Save new message
 app.post('/api/messages', (req, res) => {
     try {
-        const { name, email, message } = req.body;
+        const { name, email, message, subject } = req.body;
         
         if (!name || !email || !message) {
             return res.status(400).json({ error: 'All fields are required' });
         }
 
-        const messagesData = fs.readFileSync('messages.json', 'utf8');
-        const messages = JSON.parse(messagesData);
-        
         const newMessage = {
-            id: Date.now(),
             name,
             email,
+            subject: subject || '',
             message,
-            date: new Date().toISOString(),
-            read: false
+            status: 'unread'
         };
         
-        messages.unshift(newMessage); // Add to beginning of array
-        
-        fs.writeFileSync('messages.json', JSON.stringify(messages, null, 2));
+        messageDb.create(newMessage);
         
         res.status(201).json({ success: true, message: 'Message sent successfully' });
     } catch (error) {
@@ -324,18 +288,13 @@ app.post('/api/messages', (req, res) => {
 app.patch('/api/messages/:id', (req, res) => {
     try {
         const messageId = parseInt(req.params.id);
-        const messagesData = fs.readFileSync('messages.json', 'utf8');
-        const messages = JSON.parse(messagesData);
+        const message = messageDb.getById(messageId);
         
-        const messageIndex = messages.findIndex(m => m.id === messageId);
-        
-        if (messageIndex === -1) {
+        if (!message) {
             return res.status(404).json({ error: 'Message not found' });
         }
         
-        messages[messageIndex].read = true;
-        
-        fs.writeFileSync('messages.json', JSON.stringify(messages, null, 2));
+        messageDb.updateStatus(messageId, 'read');
         
         res.json({ success: true });
     } catch (error) {
@@ -348,12 +307,7 @@ app.patch('/api/messages/:id', (req, res) => {
 app.delete('/api/messages/:id', (req, res) => {
     try {
         const messageId = parseInt(req.params.id);
-        const messagesData = fs.readFileSync('messages.json', 'utf8');
-        let messages = JSON.parse(messagesData);
-        
-        messages = messages.filter(m => m.id !== messageId);
-        
-        fs.writeFileSync('messages.json', JSON.stringify(messages, null, 2));
+        messageDb.delete(messageId);
         
         res.json({ success: true });
     } catch (error) {
@@ -369,8 +323,12 @@ app.delete('/api/messages/:id', (req, res) => {
 // Get all subscribers
 app.get('/api/subscribers', (req, res) => {
     try {
-        const subscribersData = fs.readFileSync('subscribers.json', 'utf8');
-        const subscribers = JSON.parse(subscribersData);
+        const subscribers = subscriberDb.getAll().map(sub => ({
+            id: sub.id,
+            email: sub.email,
+            date: sub.subscribed_at,
+            status: sub.status
+        }));
         res.json(subscribers);
     } catch (error) {
         console.error(error);
@@ -387,24 +345,13 @@ app.post('/api/subscribers', (req, res) => {
             return res.status(400).json({ error: 'Email is required' });
         }
 
-        const subscribersData = fs.readFileSync('subscribers.json', 'utf8');
-        const subscribers = JSON.parse(subscribersData);
-        
         // Check if email already exists
-        const existingSubscriber = subscribers.find(s => s.email === email);
+        const existingSubscriber = subscriberDb.getByEmail(email);
         if (existingSubscriber) {
             return res.status(400).json({ error: 'Email already subscribed' });
         }
         
-        const newSubscriber = {
-            id: Date.now(),
-            email,
-            date: new Date().toISOString()
-        };
-        
-        subscribers.unshift(newSubscriber);
-        
-        fs.writeFileSync('subscribers.json', JSON.stringify(subscribers, null, 2));
+        subscriberDb.create(email);
         
         res.status(201).json({ success: true, message: 'Subscribed successfully' });
     } catch (error) {
@@ -417,12 +364,11 @@ app.post('/api/subscribers', (req, res) => {
 app.delete('/api/subscribers/:id', (req, res) => {
     try {
         const subscriberId = parseInt(req.params.id);
-        const subscribersData = fs.readFileSync('subscribers.json', 'utf8');
-        let subscribers = JSON.parse(subscribersData);
+        const subscriber = subscriberDb.getAll().find(s => s.id === subscriberId);
         
-        subscribers = subscribers.filter(s => s.id !== subscriberId);
-        
-        fs.writeFileSync('subscribers.json', JSON.stringify(subscribers, null, 2));
+        if (subscriber) {
+            subscriberDb.delete(subscriber.email);
+        }
         
         res.json({ success: true });
     } catch (error) {
@@ -446,4 +392,5 @@ app.listen(PORT, () => {
     console.log(`📱 Website: http://localhost:${PORT}`);
     console.log(`⚙️  Admin Panel: http://localhost:${PORT}/admin`);
     console.log(`🔐 Default Login: username: admin, password: admin123`);
+    console.log(`💾 Database: SQLite (data/noviqueen.db)`);
 });

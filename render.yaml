@@ -1,0 +1,26 @@
+services:
+  # Web Service
+  - type: web
+    name: noviqueen-beads-creative
+    env: node
+    region: oregon # Change to your preferred region
+    plan: free # Change to 'starter' or higher for production
+    buildCommand: npm install && npm run db:migrate
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: BCRYPT_ROUNDS
+        value: 10
+      - key: MAX_FILE_SIZE
+        value: 5242880
+    # Persistent disk for uploads and database
+    disk:
+      name: data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
