@@ -12,7 +12,7 @@
  *   node db-viewer.js backup             - Create database backup
  */
 
-const { db, adminDb, productDb, messageDb, subscriberDb } = require('./database');
+const { pool, adminDb, productDb, messageDb, subscriberDb } = require('./database');
 const fs = require('fs');
 const path = require('path');
 
@@ -46,18 +46,16 @@ COMMANDS:
   messages      View all messages
   subscribers   View all subscribers
   stats         View database statistics
-  backup        Create database backup
   help          Show this help message
 
 EXAMPLES:
   node db-viewer.js products
   node db-viewer.js stats
-  node db-viewer.js backup
         `);
     },
 
-    products: () => {
-        const products = productDb.getAll();
+    products: async () => {
+        const products = await productDb.getAll();
         const formatted = products.map(p => ({
             ID: p.id,
             Name: p.name.substring(0, 40),
@@ -82,8 +80,8 @@ EXAMPLES:
         }
     },
 
-    messages: () => {
-        const messages = messageDb.getAll();
+    messages: async () => {
+        const messages = await messageDb.getAll();
         const formatted = messages.map(m => ({
             ID: m.id,
             Name: m.name,
@@ -100,8 +98,8 @@ EXAMPLES:
         }
     },
 
-    subscribers: () => {
-        const subscribers = subscriberDb.getAll();
+    subscribers: async () => {
+        const subscribers = await subscriberDb.getAll();
         const formatted = subscribers.map(s => ({
             ID: s.id,
             Email: s.email,
@@ -114,11 +112,11 @@ EXAMPLES:
         console.log(`\n📊 Active subscribers: ${activeCount} out of ${subscribers.length}\n`);
     },
 
-    stats: () => {
-        const products = productDb.getAll();
-        const messages = messageDb.getAll();
-        const subscribers = subscriberDb.getAll();
-        const admin = adminDb.getByUsername('admin');
+    stats: async () => {
+        const products = await productDb.getAll();
+        const messages = await messageDb.getAll();
+        const subscribers = await subscriberDb.getAll();
+        const admin = await adminDb.getByUsername('admin');
 
         console.log('\n═══════════════════════════════════════');
         console.log('  📊 DATABASE STATISTICS');
@@ -132,7 +130,7 @@ EXAMPLES:
         const categories = [...new Set(products.map(p => p.category))];
         console.log(`   Categories: ${categories.join(', ')}`);
         
-        const avgPrice = products.reduce((sum, p) => sum + p.price, 0) / products.length;
+        const avgPrice = products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.price), 0) / products.length : 0;
         console.log(`   Average Price: ₱${avgPrice.toFixed(2)}`);
 
         console.log('\n💬 MESSAGES:');
@@ -148,47 +146,31 @@ EXAMPLES:
         console.log(`   Username: ${admin ? admin.username : 'Not configured'}`);
         console.log(`   Created: ${admin ? new Date(admin.created_at).toLocaleDateString() : 'N/A'}`);
 
-        // Database file stats
-        const dbPath = path.join(__dirname, 'data', 'noviqueen.db');
-        if (fs.existsSync(dbPath)) {
-            const stats = fs.statSync(dbPath);
-            console.log('\n💾 DATABASE FILE:');
-            console.log(`   Location: ${dbPath}`);
-            console.log(`   Size: ${(stats.size / 1024).toFixed(2)} KB`);
-            console.log(`   Last Modified: ${stats.mtime.toLocaleString()}`);
-        }
+        console.log('\n💾 DATABASE:');
+        console.log(`   Type: PostgreSQL (Supabase)`);
+        console.log(`   Connection: Active`);
 
         console.log('\n═══════════════════════════════════════\n');
-    },
-
-    backup: () => {
-        const dbPath = path.join(__dirname, 'data', 'noviqueen.db');
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
-        const backupPath = path.join(__dirname, 'data', `noviqueen.backup.${timestamp}.db`);
-
-        try {
-            fs.copyFileSync(dbPath, backupPath);
-            const stats = fs.statSync(backupPath);
-            
-            console.log('\n✅ Database backup created successfully!\n');
-            console.log(`   From: ${dbPath}`);
-            console.log(`   To:   ${backupPath}`);
-            console.log(`   Size: ${(stats.size / 1024).toFixed(2)} KB`);
-            console.log('');
-        } catch (error) {
-            console.error('\n❌ Failed to create backup:', error.message, '\n');
-        }
     }
 };
 
 // Execute command
-const handler = commands[command];
-if (handler) {
-    handler();
-} else {
-    console.log(`\n❌ Unknown command: ${command}`);
-    console.log('   Run "node db-viewer.js help" for usage information\n');
+async function run() {
+    const handler = commands[command];
+    if (handler) {
+        try {
+            await handler();
+        } catch (error) {
+            console.error('\n❌ Error:', error.message, '\n');
+        }
+    } else {
+        console.log(`\n❌ Unknown command: ${command}`);
+        console.log('   Run "node db-viewer.js help" for usage information\n');
+    }
+    
+    // Close database connection
+    await pool.end();
+    process.exit(0);
 }
 
-// Close database connection
-db.close();
+run();

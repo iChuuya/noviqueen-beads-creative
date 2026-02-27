@@ -4,7 +4,7 @@ services:
     name: noviqueen-beads-creative
     env: node
     region: oregon # Change to your preferred region
-    plan: free # Change to 'starter' or higher for production
+    plan: free
     buildCommand: npm install && npm run db:migrate
     startCommand: npm start
     healthCheckPath: /
@@ -13,14 +13,11 @@ services:
         value: production
       - key: PORT
         value: 3000
+      - key: DATABASE_URL
+        sync: false # Set this manually in Render dashboard with your Supabase connection string
       - key: SESSION_SECRET
         generateValue: true
       - key: BCRYPT_ROUNDS
         value: 10
       - key: MAX_FILE_SIZE
         value: 5242880
-    # Persistent disk for uploads and database
-    disk:
-      name: data
-      mountPath: /opt/render/project/src/data
-      sizeGB: 1

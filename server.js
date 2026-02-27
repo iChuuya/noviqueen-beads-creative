@@ -56,11 +56,11 @@ const PRODUCTS_FILE = path.join(__dirname, 'data', 'products.json');
 const ADMIN_FILE = path.join(__dirname, 'data', 'admin.json');
 
 // Initialize admin if doesn't exist in database (default password: admin123)
-const initializeAdmin = () => {
-    const existingAdmin = adminDb.getByUsername('admin');
+const initializeAdmin = async () => {
+    const existingAdmin = await adminDb.getByUsername('admin');
     if (!existingAdmin) {
         const hashedPassword = bcrypt.hashSync('admin123', 10);
-        adminDb.create('admin', hashedPassword);
+        await adminDb.create('admin', hashedPassword);
         console.log('✅ Default admin account created');
     }
 };
@@ -86,10 +86,10 @@ const formatProduct = (product) => {
 // ===================================
 
 // Get all products
-app.get('/api/products', (req, res) => {
+app.get('/api/products', async (req, res) => {
     try {
-        const products = productDb.getAll().map(formatProduct);
-        res.json(products);
+        const products = await productDb.getAll();
+        res.json(products.map(formatProduct));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch products' });
@@ -97,9 +97,9 @@ app.get('/api/products', (req, res) => {
 });
 
 // Get single product
-app.get('/api/products/:id', (req, res) => {
+app.get('/api/products/:id', async (req, res) => {
     try {
-        const product = productDb.getById(parseInt(req.params.id));
+        const product = await productDb.getById(parseInt(req.params.id));
         
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
@@ -113,10 +113,10 @@ app.get('/api/products/:id', (req, res) => {
 });
 
 // Admin login
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', async (req, res) => {
     try {
         const { username, password } = req.body;
-        const admin = adminDb.getByUsername(username);
+        const admin = await adminDb.getByUsername(username);
         
         if (admin && bcrypt.compareSync(password, admin.password)) {
             res.json({ success: true, message: 'Login successful' });
@@ -130,14 +130,14 @@ app.post('/api/admin/login', (req, res) => {
 });
 
 // Change admin password
-app.post('/api/admin/change-password', (req, res) => {
+app.post('/api/admin/change-password', async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
-        const admin = adminDb.getByUsername('admin');
+        const admin = await adminDb.getByUsername('admin');
         
         if (admin && bcrypt.compareSync(currentPassword, admin.password)) {
             const hashedPassword = bcrypt.hashSync(newPassword, 10);
-            adminDb.update('admin', hashedPassword);
+            await adminDb.update('admin', hashedPassword);
             res.json({ success: true, message: 'Password changed successfully' });
         } else {
             res.status(401).json({ success: false, message: 'Current password is incorrect' });
@@ -149,7 +149,7 @@ app.post('/api/admin/change-password', (req, res) => {
 });
 
 // Create new product
-app.post('/api/products', upload.single('image'), (req, res) => {
+app.post('/api/products', upload.single('image'), async (req, res) => {
     try {
         const newProduct = {
             name: req.body.name,
@@ -161,8 +161,7 @@ app.post('/api/products', upload.single('image'), (req, res) => {
             featured: req.body.featured === 'true'
         };
         
-        const result = productDb.create(newProduct);
-        const createdProduct = productDb.getById(result.lastInsertRowid);
+        const createdProduct = await productDb.create(newProduct);
         
         res.json({ success: true, product: formatProduct(createdProduct) });
     } catch (error) {
@@ -172,10 +171,10 @@ app.post('/api/products', upload.single('image'), (req, res) => {
 });
 
 // Update product
-app.put('/api/products/:id', upload.single('image'), (req, res) => {
+app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     try {
         const productId = parseInt(req.params.id);
-        const existingProduct = productDb.getById(productId);
+        const existingProduct = await productDb.getById(productId);
         
         if (!existingProduct) {
             return res.status(404).json({ error: 'Product not found' });
@@ -198,8 +197,7 @@ app.put('/api/products/:id', upload.single('image'), (req, res) => {
             updatedProduct.image = req.body.imageUrl;
         }
         
-        productDb.update(productId, updatedProduct);
-        const updated = productDb.getById(productId);
+        const updated = await productDb.update(productId, updatedProduct);
         
         res.json({ success: true, product: formatProduct(updated) });
     } catch (error) {
@@ -209,10 +207,10 @@ app.put('/api/products/:id', upload.single('image'), (req, res) => {
 });
 
 // Delete product
-app.delete('/api/products/:id', (req, res) => {
+app.delete('/api/products/:id', async (req, res) => {
     try {
         const productId = parseInt(req.params.id);
-        const product = productDb.getById(productId);
+        const product = await productDb.getById(productId);
         
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
@@ -226,7 +224,7 @@ app.delete('/api/products/:id', (req, res) => {
             }
         }
         
-        productDb.delete(productId);
+        await productDb.delete(productId);
         
         res.json({ success: true, message: 'Product deleted successfully' });
     } catch (error) {
@@ -240,9 +238,10 @@ app.delete('/api/products/:id', (req, res) => {
 // ===================================
 
 // Get all messages
-app.get('/api/messages', (req, res) => {
+app.get('/api/messages', async (req, res) => {
     try {
-        const messages = messageDb.getAll().map(msg => ({
+        const messages = await messageDb.getAll();
+        res.json(messages.map(msg => ({
             id: msg.id,
             name: msg.name,
             email: msg.email,
@@ -250,8 +249,7 @@ app.get('/api/messages', (req, res) => {
             message: msg.message,
             date: msg.created_at,
             read: msg.status === 'read'
-        }));
-        res.json(messages);
+        })));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to retrieve messages' });
@@ -259,7 +257,7 @@ app.get('/api/messages', (req, res) => {
 });
 
 // Save new message
-app.post('/api/messages', (req, res) => {
+app.post('/api/messages', async (req, res) => {
     try {
         const { name, email, message, subject } = req.body;
         
@@ -275,7 +273,7 @@ app.post('/api/messages', (req, res) => {
             status: 'unread'
         };
         
-        messageDb.create(newMessage);
+        await messageDb.create(newMessage);
         
         res.status(201).json({ success: true, message: 'Message sent successfully' });
     } catch (error) {
@@ -285,16 +283,16 @@ app.post('/api/messages', (req, res) => {
 });
 
 // Mark message as read
-app.patch('/api/messages/:id', (req, res) => {
+app.patch('/api/messages/:id', async (req, res) => {
     try {
         const messageId = parseInt(req.params.id);
-        const message = messageDb.getById(messageId);
+        const message = await messageDb.getById(messageId);
         
         if (!message) {
             return res.status(404).json({ error: 'Message not found' });
         }
         
-        messageDb.updateStatus(messageId, 'read');
+        await messageDb.updateStatus(messageId, 'read');
         
         res.json({ success: true });
     } catch (error) {
@@ -304,10 +302,10 @@ app.patch('/api/messages/:id', (req, res) => {
 });
 
 // Delete message
-app.delete('/api/messages/:id', (req, res) => {
+app.delete('/api/messages/:id', async (req, res) => {
     try {
         const messageId = parseInt(req.params.id);
-        messageDb.delete(messageId);
+        await messageDb.delete(messageId);
         
         res.json({ success: true });
     } catch (error) {
@@ -321,15 +319,15 @@ app.delete('/api/messages/:id', (req, res) => {
 // ===================================
 
 // Get all subscribers
-app.get('/api/subscribers', (req, res) => {
+app.get('/api/subscribers', async (req, res) => {
     try {
-        const subscribers = subscriberDb.getAll().map(sub => ({
+        const subscribers = await subscriberDb.getAll();
+        res.json(subscribers.map(sub => ({
             id: sub.id,
             email: sub.email,
             date: sub.subscribed_at,
             status: sub.status
-        }));
-        res.json(subscribers);
+        })));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to retrieve subscribers' });
@@ -337,7 +335,7 @@ app.get('/api/subscribers', (req, res) => {
 });
 
 // Add new subscriber
-app.post('/api/subscribers', (req, res) => {
+app.post('/api/subscribers', async (req, res) => {
     try {
         const { email } = req.body;
         
@@ -346,12 +344,12 @@ app.post('/api/subscribers', (req, res) => {
         }
 
         // Check if email already exists
-        const existingSubscriber = subscriberDb.getByEmail(email);
+        const existingSubscriber = await subscriberDb.getByEmail(email);
         if (existingSubscriber) {
             return res.status(400).json({ error: 'Email already subscribed' });
         }
         
-        subscriberDb.create(email);
+        await subscriberDb.create(email);
         
         res.status(201).json({ success: true, message: 'Subscribed successfully' });
     } catch (error) {
@@ -361,13 +359,14 @@ app.post('/api/subscribers', (req, res) => {
 });
 
 // Delete subscriber
-app.delete('/api/subscribers/:id', (req, res) => {
+app.delete('/api/subscribers/:id', async (req, res) => {
     try {
         const subscriberId = parseInt(req.params.id);
-        const subscriber = subscriberDb.getAll().find(s => s.id === subscriberId);
+        const subscribers = await subscriberDb.getAll();
+        const subscriber = subscribers.find(s => s.id === subscriberId);
         
         if (subscriber) {
-            subscriberDb.delete(subscriber.email);
+            await subscriberDb.delete(subscriber.email);
         }
         
         res.json({ success: true });
@@ -392,5 +391,5 @@ app.listen(PORT, () => {
     console.log(`📱 Website: http://localhost:${PORT}`);
     console.log(`⚙️  Admin Panel: http://localhost:${PORT}/admin`);
     console.log(`🔐 Default Login: username: admin, password: admin123`);
-    console.log(`💾 Database: SQLite (data/noviqueen.db)`);
+    console.log(`💾 Database: PostgreSQL (Supabase)`);
 });

@@ -1,254 +1,283 @@
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+require('dotenv').config();
+const { Pool } = require('pg');
 
-// Ensure data directory exists
-const dataDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+// Create PostgreSQL connection pool
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false // Required for Supabase
+    }
+});
+
+// Test connection
+pool.on('connect', () => {
+    console.log('✅ Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+    console.error('❌ Unexpected database error:', err);
+});
+
+// Create tables (PostgreSQL syntax)
+async function initializeDatabase() {
+    const client = await pool.connect();
+    try {
+        // Admin table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS admins (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Products table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS products (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                description TEXT,
+                price DECIMAL(10, 2) NOT NULL,
+                category VARCHAR(100) NOT NULL,
+                image TEXT,
+                in_stock BOOLEAN DEFAULT true,
+                featured BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Messages/Contact table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS messages (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL,
+                subject VARCHAR(500),
+                message TEXT NOT NULL,
+                status VARCHAR(50) DEFAULT 'unread',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Subscribers table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS subscribers (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                status VARCHAR(50) DEFAULT 'active',
+                subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Orders table (for future use)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS orders (
+                id SERIAL PRIMARY KEY,
+                customer_name VARCHAR(255) NOT NULL,
+                customer_email VARCHAR(255) NOT NULL,
+                customer_phone VARCHAR(50),
+                total_amount DECIMAL(10, 2) NOT NULL,
+                status VARCHAR(50) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Order items table (for future use)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS order_items (
+                id SERIAL PRIMARY KEY,
+                order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+                product_id INTEGER NOT NULL REFERENCES products(id),
+                quantity INTEGER NOT NULL,
+                price DECIMAL(10, 2) NOT NULL
+            )
+        `);
+
+        console.log('✅ Database tables initialized successfully');
+    } catch (error) {
+        console.error('❌ Error initializing database:', error);
+        throw error;
+    } finally {
+        client.release();
+    }
 }
 
-// Initialize database
-const dbPath = path.join(dataDir, 'noviqueen.db');
-const db = new Database(dbPath);
-
-// Enable foreign keys
-db.pragma('foreign_keys = ON');
-
-// Create tables
-function initializeDatabase() {
-    // Admin table
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS admins (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
-
-    // Products table
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            description TEXT,
-            price REAL NOT NULL,
-            category TEXT NOT NULL,
-            image TEXT,
-            in_stock INTEGER DEFAULT 1,
-            featured INTEGER DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
-
-    // Messages/Contact table
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT NOT NULL,
-            subject TEXT,
-            message TEXT NOT NULL,
-            status TEXT DEFAULT 'unread',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
-
-    // Subscribers table
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS subscribers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            status TEXT DEFAULT 'active',
-            subscribed_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
-
-    // Orders table (for future use)
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            customer_name TEXT NOT NULL,
-            customer_email TEXT NOT NULL,
-            customer_phone TEXT,
-            total_amount REAL NOT NULL,
-            status TEXT DEFAULT 'pending',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
-
-    // Order items table (for future use)
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS order_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            order_id INTEGER NOT NULL,
-            product_id INTEGER NOT NULL,
-            quantity INTEGER NOT NULL,
-            price REAL NOT NULL,
-            FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-            FOREIGN KEY (product_id) REFERENCES products(id)
-        )
-    `);
-
-    console.log('✅ Database tables initialized successfully');
-}
-
-// Database wrapper functions
+// Database wrapper functions (now async)
 
 // Admin functions
 const adminDb = {
-    getByUsername: (username) => {
-        const stmt = db.prepare('SELECT * FROM admins WHERE username = ?');
-        return stmt.get(username);
+    getByUsername: async (username) => {
+        const result = await pool.query('SELECT * FROM admins WHERE username = $1', [username]);
+        return result.rows[0];
     },
     
-    create: (username, hashedPassword) => {
-        const stmt = db.prepare('INSERT INTO admins (username, password) VALUES (?, ?)');
-        return stmt.run(username, hashedPassword);
+    create: async (username, hashedPassword) => {
+        const result = await pool.query(
+            'INSERT INTO admins (username, password) VALUES ($1, $2) RETURNING *',
+            [username, hashedPassword]
+        );
+        return result.rows[0];
     },
     
-    update: (username, hashedPassword) => {
-        const stmt = db.prepare('UPDATE admins SET password = ? WHERE username = ?');
-        return stmt.run(hashedPassword, username);
+    update: async (username, hashedPassword) => {
+        const result = await pool.query(
+            'UPDATE admins SET password = $1 WHERE username = $2 RETURNING *',
+            [hashedPassword, username]
+        );
+        return result.rows[0];
     }
 };
 
 // Product functions
 const productDb = {
-    getAll: () => {
-        const stmt = db.prepare('SELECT * FROM products ORDER BY created_at DESC');
-        return stmt.all();
+    getAll: async () => {
+        const result = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
+        return result.rows;
     },
     
-    getById: (id) => {
-        const stmt = db.prepare('SELECT * FROM products WHERE id = ?');
-        return stmt.get(id);
+    getById: async (id) => {
+        const result = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+        return result.rows[0];
     },
     
-    getFeatured: () => {
-        const stmt = db.prepare('SELECT * FROM products WHERE featured = 1 ORDER BY created_at DESC');
-        return stmt.all();
+    getFeatured: async () => {
+        const result = await pool.query('SELECT * FROM products WHERE featured = true ORDER BY created_at DESC');
+        return result.rows;
     },
     
-    getByCategory: (category) => {
-        const stmt = db.prepare('SELECT * FROM products WHERE category = ? ORDER BY created_at DESC');
-        return stmt.all(category);
+    getByCategory: async (category) => {
+        const result = await pool.query('SELECT * FROM products WHERE category = $1 ORDER BY created_at DESC', [category]);
+        return result.rows;
     },
     
-    create: (product) => {
-        const stmt = db.prepare(`
-            INSERT INTO products (name, description, price, category, image, in_stock, featured)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-        return stmt.run(
-            product.name,
-            product.description,
-            product.price,
-            product.category,
-            product.image,
-            product.inStock ? 1 : 0,
-            product.featured ? 1 : 0
+    create: async (product) => {
+        const result = await pool.query(
+            `INSERT INTO products (name, description, price, category, image, in_stock, featured)
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+            [
+                product.name,
+                product.description,
+                product.price,
+                product.category,
+                product.image,
+                product.inStock !== undefined ? product.inStock : true,
+                product.featured !== undefined ? product.featured : false
+            ]
         );
+        return result.rows[0];
     },
     
-    update: (id, product) => {
-        const stmt = db.prepare(`
-            UPDATE products 
-            SET name = ?, description = ?, price = ?, category = ?, 
-                image = ?, in_stock = ?, featured = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `);
-        return stmt.run(
-            product.name,
-            product.description,
-            product.price,
-            product.category,
-            product.image,
-            product.inStock ? 1 : 0,
-            product.featured ? 1 : 0,
-            id
+    update: async (id, product) => {
+        const result = await pool.query(
+            `UPDATE products 
+             SET name = $1, description = $2, price = $3, category = $4, 
+                 image = $5, in_stock = $6, featured = $7, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $8 RETURNING *`,
+            [
+                product.name,
+                product.description,
+                product.price,
+                product.category,
+                product.image,
+                product.inStock !== undefined ? product.inStock : true,
+                product.featured !== undefined ? product.featured : false,
+                id
+            ]
         );
+        return result.rows[0];
     },
     
-    delete: (id) => {
-        const stmt = db.prepare('DELETE FROM products WHERE id = ?');
-        return stmt.run(id);
+    delete: async (id) => {
+        const result = await pool.query('DELETE FROM products WHERE id = $1 RETURNING *', [id]);
+        return result.rows[0];
     }
 };
 
 // Message functions
 const messageDb = {
-    getAll: () => {
-        const stmt = db.prepare('SELECT * FROM messages ORDER BY created_at DESC');
-        return stmt.all();
+    getAll: async () => {
+        const result = await pool.query('SELECT * FROM messages ORDER BY created_at DESC');
+        return result.rows;
     },
     
-    getById: (id) => {
-        const stmt = db.prepare('SELECT * FROM messages WHERE id = ?');
-        return stmt.get(id);
+    getById: async (id) => {
+        const result = await pool.query('SELECT * FROM messages WHERE id = $1', [id]);
+        return result.rows[0];
     },
     
-    create: (message) => {
-        const stmt = db.prepare(`
-            INSERT INTO messages (name, email, subject, message, status)
-            VALUES (?, ?, ?, ?, ?)
-        `);
-        return stmt.run(
-            message.name,
-            message.email,
-            message.subject || '',
-            message.message,
-            message.status || 'unread'
+    create: async (message) => {
+        const result = await pool.query(
+            `INSERT INTO messages (name, email, subject, message, status)
+             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            [
+                message.name,
+                message.email,
+                message.subject || '',
+                message.message,
+                message.status || 'unread'
+            ]
         );
+        return result.rows[0];
     },
     
-    updateStatus: (id, status) => {
-        const stmt = db.prepare('UPDATE messages SET status = ? WHERE id = ?');
-        return stmt.run(status, id);
+    updateStatus: async (id, status) => {
+        const result = await pool.query(
+            'UPDATE messages SET status = $1 WHERE id = $2 RETURNING *',
+            [status, id]
+        );
+        return result.rows[0];
     },
     
-    delete: (id) => {
-        const stmt = db.prepare('DELETE FROM messages WHERE id = ?');
-        return stmt.run(id);
+    delete: async (id) => {
+        const result = await pool.query('DELETE FROM messages WHERE id = $1 RETURNING *', [id]);
+        return result.rows[0];
     }
 };
 
 // Subscriber functions
 const subscriberDb = {
-    getAll: () => {
-        const stmt = db.prepare('SELECT * FROM subscribers ORDER BY subscribed_at DESC');
-        return stmt.all();
+    getAll: async () => {
+        const result = await pool.query('SELECT * FROM subscribers ORDER BY subscribed_at DESC');
+        return result.rows;
     },
     
-    getByEmail: (email) => {
-        const stmt = db.prepare('SELECT * FROM subscribers WHERE email = ?');
-        return stmt.get(email);
+    getByEmail: async (email) => {
+        const result = await pool.query('SELECT * FROM subscribers WHERE email = $1', [email]);
+        return result.rows[0];
     },
     
-    create: (email) => {
-        const stmt = db.prepare('INSERT INTO subscribers (email) VALUES (?)');
-        return stmt.run(email);
+    create: async (email) => {
+        const result = await pool.query(
+            'INSERT INTO subscribers (email) VALUES ($1) RETURNING *',
+            [email]
+        );
+        return result.rows[0];
     },
     
-    updateStatus: (email, status) => {
-        const stmt = db.prepare('UPDATE subscribers SET status = ? WHERE email = ?');
-        return stmt.run(status, email);
+    updateStatus: async (email, status) => {
+        const result = await pool.query(
+            'UPDATE subscribers SET status = $1 WHERE email = $2 RETURNING *',
+            [status, email]
+        );
+        return result.rows[0];
     },
     
-    delete: (email) => {
-        const stmt = db.prepare('DELETE FROM subscribers WHERE email = ?');
-        return stmt.run(email);
+    delete: async (email) => {
+        const result = await pool.query('DELETE FROM subscribers WHERE email = $1 RETURNING *', [email]);
+        return result.rows[0];
     }
 };
 
 // Initialize database on module load
-initializeDatabase();
+initializeDatabase().catch(err => {
+    console.error('Failed to initialize database:', err);
+});
 
 module.exports = {
-    db,
+    pool,
     adminDb,
     productDb,
     messageDb,
